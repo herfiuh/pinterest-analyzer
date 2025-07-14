@@ -5,12 +5,16 @@ import os
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 
-# Pinterest OAuth settings (replace with your actual credentials)
+# Pinterest OAuth settings
 CLIENT_ID = '1525609'
 CLIENT_SECRET = 'd9e41297b07020596772579074e308671f88fec5'
-REDIRECT_URI = 'https://pinterest-analyzer.onrender.com/callback'  # updated for live deployment
+REDIRECT_URI = 'https://pinterest-analyzer.onrender.com/callback'
+
+# Pinterest OAuth URLs
 AUTHORIZATION_BASE_URL = 'https://www.pinterest.com/oauth/'
-TOKEN_URL = 'https://api.pinterest.com/v1/oauth/token/'
+TOKEN_URL = 'https://api.pinterest.com/v5/oauth/token'  # ✅ UPDATED from v1 to v5
+
+SCOPES = ['boards:read', 'pins:read']  # Adjust as needed for your app
 
 @app.route('/')
 def home():
@@ -18,23 +22,38 @@ def home():
 
 @app.route('/login')
 def login():
-    pinterest = OAuth2Session(CLIENT_ID, redirect_uri=REDIRECT_URI)
-    authorization_url, state = pinterest.authorization_url(AUTHORIZATION_BASE_URL)
+    pinterest = OAuth2Session(CLIENT_ID, redirect_uri=REDIRECT_URI, scope=SCOPES)
+    
+    # ✅ Pinterest expects these extra params
+    authorization_url, state = pinterest.authorization_url(
+        AUTHORIZATION_BASE_URL,
+        response_type='code',
+        scope=" ".join(SCOPES)
+    )
+    
     session['oauth_state'] = state
     return redirect(authorization_url)
 
 @app.route('/callback')
 def callback():
-    pinterest = OAuth2Session(CLIENT_ID, redirect_uri=REDIRECT_URI, state=session['oauth_state'])
-    pinterest.fetch_token(TOKEN_URL, client_secret=CLIENT_SECRET, authorization_response=request.url)
-    session['oauth_token'] = pinterest.token
-    return 'Pinterest login successful! You are now authenticated.'
+    pinterest = OAuth2Session(CLIENT_ID, redirect_uri=REDIRECT_URI, state=session.get('oauth_state'))
+
+    try:
+        token = pinterest.fetch_token(
+            TOKEN_URL,
+            client_secret=CLIENT_SECRET,
+            authorization_response=request.url
+        )
+    except Exception as e:
+        return f"OAuth failed: {str(e)}"
+    
+    session['oauth_token'] = token
+    return '✅ Pinterest login successful! You are now authenticated.'
 
 @app.route('/test')
 def test():
-    return "Test route working!"
+    return "✅ Test route working!"
 
-# ✅ NEW: Privacy Policy Route
 @app.route('/privacy')
 def privacy():
     return """
