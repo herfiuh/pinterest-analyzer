@@ -15,27 +15,32 @@ SCOPE = ['boards:read', 'pins:read']
 
 @app.route('/')
 def home():
-    return redirect('/dashboard')
+    return """
+        <h2>Welcome to the Pinterest Analyzer</h2>
+        <a href='/login'>Login with Pinterest</a>
+    """
 
 @app.route('/login', methods=['GET'])
 def login():
     pinterest = OAuth2Session(CLIENT_ID, redirect_uri=REDIRECT_URI, scope=SCOPE)
-    url, state = pinterest.authorization_url(AUTHORIZATION_BASE_URL)
+    authorization_url, state = pinterest.authorization_url(AUTHORIZATION_BASE_URL)
     session['oauth_state'] = state
-    return redirect(url)
+    return redirect(authorization_url)
 
 @app.route('/callback')
 def callback():
     pinterest = OAuth2Session(CLIENT_ID, redirect_uri=REDIRECT_URI, state=session.get('oauth_state'))
     try:
         token = pinterest.fetch_token(
-            TOKEN_URL, client_id=CLIENT_ID, client_secret=CLIENT_SECRET,
+            TOKEN_URL,
+            client_id=CLIENT_ID,
+            client_secret=CLIENT_SECRET,
             authorization_response=request.url
         )
         session['oauth_token'] = token
         return redirect('/dashboard')
     except Exception as e:
-        return f"<h3>Error:</h3><pre>{str(e)}</pre>"
+        return f"<h3>❌ Error during authentication:</h3><pre>{str(e)}</pre>"
 
 @app.route('/dashboard')
 def dashboard():
@@ -44,108 +49,151 @@ def dashboard():
         return redirect('/login')
 
     pinterest = OAuth2Session(CLIENT_ID, token=token)
+
     try:
-        user = pinterest.get('https://api.pinterest.com/v5/user_account').json()
+        user_info = pinterest.get('https://api.pinterest.com/v5/user_account').json()
         boards_resp = pinterest.get('https://api.pinterest.com/v5/boards')
         boards_data = boards_resp.json().get('items', [])
+
         boards = []
-        for b in boards_data:
-            board = {
-                'id': b['id'],
-                'name': b.get('name'),
-                'img': b.get('media', {}).get('image_cover_url') or "https://via.placeholder.com/300?text=No+Image",
-                'url': b.get('url'),
-                'sections': []
-            }
-            # Fetch sections & one latest pin img
-            sec_resp = pinterest.get(f"https://api.pinterest.com/v5/boards/{b['id']}/sections")
-            secs = sec_resp.json().get('items', [])
-            for s in secs:
-                pin_resp = pinterest.get(f"https://api.pinterest.com/v5/sections/{s['id']}/pins?limit=1")
-                pin_items = pin_resp.json().get('items', [])
-                img = pin_items[0].get('media', {}).get('images', [{}])[0].get('url') if pin_items else None
-                board['sections'].append({'id': s['id'], 'title': s['title'], 'img': img})
-            boards.append(board)
+        for board in boards_data:
+            board_id = board['id']
+            section_resp = pinterest.get(f'https://api.pinterest.com/v5/boards/{board_id}/sections')
+            sections = section_resp.json().get('items', [])
 
-        return render_template_string(TEMPLATE, user=user, boards=boards)
+            if sections:
+                section_previews = []
+                for section in sections:
+                    sec_id = section.get('id')
+                    # Get latest pin as preview (fallback image if none)
+                    pin_resp = pinterest.get(f'https://api.pinterest.com/v5/boards/{board_id}/sections/{sec_id}/pins')
+                    pins = pin_resp.json().get('items', [])
+                    img = pins[0]['media']['images']['original']['url'] if pins else "https://via.placeholder.com/150x100?text=No+Image"
+                    section_previews.append({'id': sec_id, 'image': img})
+
+                boards.append({
+                    'id': board_id,
+                    'name': board.get('name'),
+                    'cover_image': board.get('media', {}).get('image_cover_url') or "https://via.placeholder.com/300x200?text=No+Image",
+                    'sections': section_previews
+                })
+            else:
+                boards.append({
+                    'id': board_id,
+                    'name': board.get('name'),
+                    'description': board.get('description', ''),
+                    'cover_image': board.get('media', {}).get('image_cover_url') or "https://via.placeholder.com/300x200?text=No+Image",
+                    'sections': None
+                })
+
+        return render_template_string(DASHBOARD_TEMPLATE, user_info=user_info, boards=boards)
     except Exception as e:
-        return f"<h3>Error loading dashboard:</h3><pre>{str(e)}</pre>"
-
-# Rendered HTML + CSS
-TEMPLATE = """
-<!DOCTYPE html><html><head>
-<link href="https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap" rel="stylesheet">
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-<style>
-  body { background:#ffe6e6; font-family:'Great Vibes', cursive; color:#4b0000; }
-  .top-bar { display:flex; justify-content:space-between; align-items:center; padding:1rem; }
-  .brand { font-size:2.5rem; }
-  .keypad-btn { font-family:'Great Vibes', cursive; font-size:1.5rem;
-    background:#800020;color:#fff;border:none;padding:0.5rem 1rem;border-radius:8px;
-  }
-  .overlay { display:none; position:fixed;top:0;left:0;width:100%;height:100%;
-     background:rgba(255,255,255,0.95); z-index:10; padding:2rem; }
-  .overlay.open { display:block; }
-  .catalogue-item { margin:1rem 0; font-size:1.3rem; cursor:pointer; }
-  .board-card img { height:200px;object-fit:cover;border-radius:8px; }
-</style>
-</head><body>
-
-<div class="top-bar">
-  <div class="brand">P!nlyzer</div>
-  <button class="keypad-btn" onclick="document.getElementById('catalogue').classList.toggle('open')">P!NLYZE</button>
-</div>
-
-<div id="catalogue" class="overlay">
-  <h2>Select a function</h2>
-  <div class="catalogue-item">🎨 Analyze Colors & Themes</div>
-  <div class="catalogue-item">🌈 Vibe & Energy Mood</div>
-  <div class="catalogue-item">🧠 Psychological Profile</div>
-  <div class="catalogue-item">💬 Create Board Persona</div>
-</div>
-
-<div class="container mt-4">
-  <h3>Welcome, {{ user['username'] }}</h3>
-  <div class="row">
-    {% for b in boards %}
-      <div class="col-md-4 mb-4">
-        <div class="card">
-          <!-- Cover Image -->
-          <img src="{{ b.img }}" class="card-img-top" alt="{{ b.name }}">
-          <div class="card-body">
-            <h5 class="card-title">{{ b.name }}</h5>
-            {% if b.sections %}
-              <p>Sections:</p>
-              <div class="d-flex">
-                {% for s in b.sections %}
-                  {% if s.img %}
-                    <img src="{{ s.img }}" width="60" class="me-2" style="border-radius:4px;">
-                  {% endif %}
-                {% endfor %}
-              </div>
-            {% endif %}
-            <a href="https://pinterest.com{{ b.url }}" class="btn btn-outline-danger mt-2" target="_blank">
-              View Board
-            </a>
-          </div>
-        </div>
-      </div>
-    {% endfor %}
-  </div>
-</div>
-
-</body></html>
-"""
+        return f"<h3>❌ Failed to load dashboard:</h3><pre>{str(e)}</pre>"
 
 @app.route('/privacy')
-def policy():
-    return redirect("/privacy")  # unchanged
+def privacy():
+    return """
+    <h1>Privacy Policy</h1>
+    <p>This app uses Pinterest API to analyze boards with user permission. We do not permanently store personal data.</p>
+    <p>You can view the full policy <a href="https://www.termsfeed.com/live/90026cd3-68b4-415e-b50a-f7420791857c" target="_blank">here</a>.</p>
+    """
 
 @app.route('/test')
 def test():
-    return "✅"
+    return "✅ Test route working!"
 
-if __name__=="__main__":
-    app.run(debug=True)
+# Dashboard Template (Triple-quoted string properly closed!)
+DASHBOARD_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>p!nlyzer Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background-color: #ffe6e6;
+            font-family: 'Great Vibes', cursive;
+            color: #4b0000;
+            padding: 20px;
+        }
+        .logo {
+            font-size: 48px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            text-shadow: 1px 1px #ccc;
+        }
+        .catalogue {
+            background: rgba(255, 240, 240, 0.8);
+            border: 2px dashed #b30059;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 40px;
+            text-align: center;
+        }
+        .board-card {
+            margin-bottom: 30px;
+        }
+        .card {
+            border: none;
+            border-radius: 12px;
+            background-color: #fff0f5;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        .card-title {
+            font-size: 24px;
+        }
+        .section-img {
+            height: 100px;
+            border-radius: 10px;
+            margin: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">p!nlyzer</div>
+
+        <div class="catalogue">
+            <h2>P!NLYZE</h2>
+            <p>Select a board or section to:</p>
+            <ul style="list-style: none; padding-left: 0;">
+                <li>💡 Analyze board themes & colors</li>
+                <li>🧠 Build psychological profiles</li>
+                <li>🧚‍♀️ Create board personas</li>
+                <li>📌 Get personalized vibe insights</li>
+            </ul>
+        </div>
+
+        <h3>Your Boards</h3>
+        <div class="row">
+            {% for board in boards %}
+            <div class="col-md-4 board-card">
+                <div class="card">
+                    <img src="{{ board['cover_image'] }}" class="card-img-top" alt="Board Cover">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ board['name'] }}</h5>
+                        {% if board['sections'] %}
+                            <div>
+                                <p style="font-size: 18px;">Sections:</p>
+                                {% for section in board['sections'] %}
+                                    <img src="{{ section['image'] }}" class="section-img" alt="Section Image">
+                                {% endfor %}
+                            </div>
+                        {% elif board['description'] %}
+                            <p class="card-text">{{ board['description'] }}</p>
+                        {% endif %}
+                        <a href="https://www.pinterest.com/{{ board['id'] }}" class="btn btn-outline-dark mt-2" target="_blank">View Board</a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</body>
+</html>
 """
 
+if __name__ == "__main__":
+    app.run(debug=True)
