@@ -39,9 +39,9 @@ def callback():
     try:
         token = pinterest.fetch_token(
             TOKEN_URL,
+            client_id=CLIENT_ID,  # ✅ Added this to fix missing_token error
             client_secret=CLIENT_SECRET,
-            authorization_response=request.url,
-            include_client_id=True
+            authorization_response=request.url
         )
         session['oauth_token'] = token
         return "<h3>✅ Pinterest login successful!</h3>"
@@ -65,3 +65,4 @@ def test():
 # Run Flask app
 if __name__ == "__main__":
     app.run(debug=True)
+
