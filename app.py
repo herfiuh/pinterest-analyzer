@@ -6,8 +6,8 @@ app = Flask(__name__)
 app.secret_key = os.urandom(24)
 
 # Pinterest OAuth settings (replace with your actual credentials)
-CLIENT_ID = 'your-actual-client-id'
-CLIENT_SECRET = 'your-actual-client-secret'
+CLIENT_ID = '1525609'
+CLIENT_SECRET = 'd9e41297b07020596772579074e308671f88fec5'
 REDIRECT_URI = 'https://pinterest-analyzer.onrender.com/callback'  # updated for live deployment
 AUTHORIZATION_BASE_URL = 'https://www.pinterest.com/oauth/'
 TOKEN_URL = 'https://api.pinterest.com/v1/oauth/token/'
