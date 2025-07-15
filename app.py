@@ -65,10 +65,16 @@ def dashboard():
                 section_previews = []
                 for section in sections:
                     sec_id = section.get('id')
-                    # Get latest pin as preview (fallback image if none)
-                    pin_resp = pinterest.get(f'https://api.pinterest.com/v5/boards/{board_id}/sections/{sec_id}/pins')
+                    pin_resp = pinterest.get(f'https://api.pinterest.com/v5/boards/{board_id}/sections/{sec_id}/pins?limit=1')
                     pins = pin_resp.json().get('items', [])
-                    img = pins[0]['media']['images']['original']['url'] if pins else "https://via.placeholder.com/150x100?text=No+Image"
+                    if pins:
+                        media = pins[0].get('media', {}).get('images', {})
+                        img = media.get('original', {}).get('url') \
+                            or media.get('large', {}).get('url') \
+                            or next(iter(media.values()), {}).get('url') \
+                            or "https://via.placeholder.com/150x100?text=No+Image"
+                    else:
+                        img = "https://via.placeholder.com/150x100?text=No+Image"
                     section_previews.append({'id': sec_id, 'image': img})
 
                 boards.append({
@@ -102,7 +108,6 @@ def privacy():
 def test():
     return "✅ Test route working!"
 
-# Dashboard Template (Triple-quoted string properly closed!)
 DASHBOARD_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
@@ -125,7 +130,7 @@ DASHBOARD_TEMPLATE = """
             text-shadow: 1px 1px #ccc;
         }
         .catalogue {
-            background: rgba(255, 240, 240, 0.8);
+            background: rgba(255, 240, 240, 0.85);
             border: 2px dashed #b30059;
             padding: 20px;
             border-radius: 12px;
@@ -197,3 +202,4 @@ DASHBOARD_TEMPLATE = """
 
 if __name__ == "__main__":
     app.run(debug=True)
+
