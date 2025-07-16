@@ -15,7 +15,43 @@ SCOPE = ['boards:read', 'pins:read']
 
 @app.route('/')
 def home():
-    return render_template_string(HOME_TEMPLATE)
+    return """
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>p!nlyzer Home</title>
+        <link href="https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap" rel="stylesheet">
+        <style>
+            body {
+                background-color: #ffe6e6;
+                font-family: 'Great Vibes', cursive;
+                color: #4b0000;
+                text-align: center;
+                padding-top: 80px;
+            }
+            .logo {
+                font-size: 64px;
+                margin-bottom: 40px;
+            }
+            .login-btn {
+                padding: 12px 24px;
+                font-size: 22px;
+                background-color: #fff0f5;
+                border: 2px solid #b30059;
+                border-radius: 8px;
+                color: #b30059;
+                cursor: pointer;
+                text-decoration: none;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="logo">p!nlyzer</div>
+        <a class="login-btn" href="/login">Log in with Pinterest</a>
+    </body>
+    </html>
+    """
 
 @app.route('/login', methods=['GET'])
 def login():
@@ -58,24 +94,29 @@ def dashboard():
             section_resp = pinterest.get(f'https://api.pinterest.com/v5/boards/{board_id}/sections')
             sections = section_resp.json().get('items', [])
 
-            section_previews = []
-            for section in sections:
-                sec_id = section.get('id')
-                pin_resp = pinterest.get(f'https://api.pinterest.com/v5/boards/{board_id}/sections/{sec_id}/pins')
-                pins = pin_resp.json().get('items', [])
-                image_url = pins[0]['media']['images'].get('original', {}).get('url') if pins else None
-                section_previews.append({
-                    'id': sec_id,
-                    'image': image_url or "https://via.placeholder.com/150x100?text=No+Image"
-                })
+            if sections:
+                section_previews = []
+                for section in sections:
+                    sec_id = section.get('id')
+                    pin_resp = pinterest.get(f'https://api.pinterest.com/v5/boards/{board_id}/sections/{sec_id}/pins')
+                    pins = pin_resp.json().get('items', [])
+                    img = pins[0].get('media', {}).get('images', {}).get('original', {}).get('url') if pins else "https://via.placeholder.com/150x100?text=No+Image"
+                    section_previews.append({'id': sec_id, 'image': img})
 
-            boards.append({
-                'id': board_id,
-                'name': board.get('name'),
-                'description': board.get('description', ''),
-                'cover_image': board.get('media', {}).get('image_cover_url') or "https://via.placeholder.com/300x200?text=No+Image",
-                'sections': section_previews
-            })
+                boards.append({
+                    'id': board_id,
+                    'name': board.get('name'),
+                    'cover_image': board.get('media', {}).get('image_cover_url') or "https://via.placeholder.com/300x200?text=No+Image",
+                    'sections': section_previews
+                })
+            else:
+                boards.append({
+                    'id': board_id,
+                    'name': board.get('name'),
+                    'description': board.get('description', ''),
+                    'cover_image': board.get('media', {}).get('image_cover_url') or "https://via.placeholder.com/300x200?text=No+Image",
+                    'sections': None
+                })
 
         return render_template_string(DASHBOARD_TEMPLATE, user_info=user_info, boards=boards)
     except Exception as e:
@@ -89,64 +130,12 @@ def privacy():
     <p>You can view the full policy <a href="https://www.termsfeed.com/live/90026cd3-68b4-415e-b50a-f7420791857c" target="_blank">here</a>.</p>
     """
 
-@app.route('/test')
-def test():
-    return "✅ Test route working!"
-
-# === Templates ===
-
-HOME_TEMPLATE = """
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>p!nlyzer</title>
-    <link href="https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap" rel="stylesheet">
-    <style>
-        body {
-            background-color: #ffe6e6;
-            font-family: 'Great Vibes', cursive;
-            color: #4b0000;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            text-align: center;
-        }
-        h1 {
-            font-size: 64px;
-            margin-bottom: 40px;
-            text-shadow: 1px 1px #fff0f5;
-        }
-        a.login-btn {
-            font-size: 24px;
-            padding: 14px 30px;
-            background-color: #ffccd5;
-            color: #4b0000;
-            border: 2px solid #b30059;
-            border-radius: 12px;
-            text-decoration: none;
-        }
-        a.login-btn:hover {
-            background-color: #f5b5c0;
-        }
-    </style>
-</head>
-<body>
-    <h1>p!nlyzer</h1>
-    <a class="login-btn" href="/login">Log in with Pinterest</a>
-</body>
-</html>
-"""
-
 DASHBOARD_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>p!nlyzer Dashboard</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap" rel="stylesheet">
     <style>
         body {
@@ -158,41 +147,40 @@ DASHBOARD_TEMPLATE = """
         .logo {
             font-size: 48px;
             margin-bottom: 20px;
-            text-shadow: 1px 1px #ccc;
         }
         .catalogue {
             background: rgba(255, 240, 240, 0.8);
             border: 2px dashed #b30059;
             padding: 20px;
             border-radius: 12px;
-            margin-bottom: 40px;
             text-align: center;
         }
         .board-card {
-            margin-bottom: 30px;
-        }
-        .card {
-            border: none;
-            border-radius: 12px;
-            background-color: #fff0f5;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            margin-bottom: 40px;
             position: relative;
         }
-        .section-img {
-            height: 100px;
-            border-radius: 10px;
-            margin: 5px;
-        }
-        .feature-button {
+        .feature-btn {
             position: absolute;
             top: 10px;
-            right: 12px;
-            font-size: 24px;
+            right: 10px;
+            background: white;
+            border-radius: 50%;
+            font-size: 20px;
+            padding: 6px 10px;
             cursor: pointer;
         }
-        .dropdown-menu {
-            font-family: Arial, sans-serif;
-            font-size: 14px;
+        .section-img {
+            height: 80px;
+            border-radius: 10px;
+            margin: 5px;
+            border: 1px solid #b30059;
+            cursor: pointer;
+        }
+        .card {
+            background-color: #fff0f5;
+            border-radius: 12px;
+            padding: 15px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
         }
     </style>
 </head>
@@ -201,15 +189,13 @@ DASHBOARD_TEMPLATE = """
         <div class="logo">p!nlyzer</div>
 
         <div class="catalogue">
-            <h2>P!NLYZE</h2>
-            <p>Select a board or section to:</p>
+            <h2>p⚚nlyze</h2>
             <ul style="list-style: none; padding-left: 0;">
                 <li>💡 Analyze board themes & colors</li>
                 <li>🧠 Build psychological profiles</li>
                 <li>🧚‍♀️ Create board personas</li>
-                <li>📌 Get personalized vibe insights</li>
                 <li>🗣 Talk to your board</li>
-                <li>🧭 Content overlap <em>(coming soon)</em></li>
+                <li>📌 Content overlap map (coming soon)</li>
             </ul>
         </div>
 
@@ -218,39 +204,22 @@ DASHBOARD_TEMPLATE = """
             {% for board in boards %}
             <div class="col-md-4 board-card">
                 <div class="card">
-                    <div class="feature-button dropdown">
-                        <span data-bs-toggle="dropdown" aria-expanded="false">⚚</span>
-                        <ul class="dropdown-menu dropdown-menu-end">
-                            <li><a class="dropdown-item" href="#">Analyze Theme</a></li>
-                            <li><a class="dropdown-item" href="#">Analyze Color</a></li>
-                            <li><a class="dropdown-item" href="#">Board Vibe</a></li>
-                            <li><a class="dropdown-item" href="#">Talk to My Board</a></li>
-                            <li><a class="dropdown-item" href="#">Board Persona</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item disabled" href="#">Content Overlap (coming soon)</a></li>
-                        </ul>
-                    </div>
-                    <img src="{{ board['cover_image'] }}" class="card-img-top" alt="Board Cover">
-                    <div class="card-body">
-                        <h5 class="card-title">{{ board['name'] }}</h5>
-                        {% if board['sections'] %}
-                            <div>
-                                <p style="font-size: 18px;">Sections:</p>
-                                {% for section in board['sections'] %}
-                                    <img src="{{ section['image'] }}" class="section-img" alt="Section Image">
-                                {% endfor %}
-                            </div>
-                        {% elif board['description'] %}
-                            <p class="card-text">{{ board['description'] }}</p>
-                        {% endif %}
-                    </div>
+                    <div class="feature-btn">⚚</div>
+                    <img src="{{ board['cover_image'] }}" alt="Board Cover" style="width: 100%; border-radius: 8px;">
+                    <h4>{{ board['name'] }}</h4>
+                    {% if board['sections'] %}
+                        <p style="font-size: 18px;">Sections:</p>
+                        {% for section in board['sections'] %}
+                            <img src="{{ section['image'] }}" class="section-img" alt="Section">
+                        {% endfor %}
+                    {% elif board['description'] %}
+                        <p>{{ board['description'] }}</p>
+                    {% endif %}
                 </div>
             </div>
             {% endfor %}
         </div>
     </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
 """
