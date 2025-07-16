@@ -61,36 +61,21 @@ def dashboard():
             section_resp = pinterest.get(f'https://api.pinterest.com/v5/boards/{board_id}/sections')
             sections = section_resp.json().get('items', [])
 
-            if sections:
-                section_previews = []
-                for section in sections:
-                    sec_id = section.get('id')
-                    pin_resp = pinterest.get(f'https://api.pinterest.com/v5/boards/{board_id}/sections/{sec_id}/pins?limit=1')
-                    pins = pin_resp.json().get('items', [])
-                    if pins:
-                        media = pins[0].get('media', {}).get('images', {})
-                        img = media.get('original', {}).get('url') \
-                            or media.get('large', {}).get('url') \
-                            or next(iter(media.values()), {}).get('url') \
-                            or "https://via.placeholder.com/150x100?text=No+Image"
-                    else:
-                        img = "https://via.placeholder.com/150x100?text=No+Image"
-                    section_previews.append({'id': sec_id, 'image': img})
+            section_previews = []
+            for section in sections:
+                sec_id = section.get('id')
+                pin_resp = pinterest.get(f'https://api.pinterest.com/v5/boards/{board_id}/sections/{sec_id}/pins')
+                pins = pin_resp.json().get('items', [])
+                img = pins[0]['media']['images']['original']['url'] if pins else "https://via.placeholder.com/150x100?text=No+Image"
+                section_previews.append({'id': sec_id, 'image': img})
 
-                boards.append({
-                    'id': board_id,
-                    'name': board.get('name'),
-                    'cover_image': board.get('media', {}).get('image_cover_url') or "https://via.placeholder.com/300x200?text=No+Image",
-                    'sections': section_previews
-                })
-            else:
-                boards.append({
-                    'id': board_id,
-                    'name': board.get('name'),
-                    'description': board.get('description', ''),
-                    'cover_image': board.get('media', {}).get('image_cover_url') or "https://via.placeholder.com/300x200?text=No+Image",
-                    'sections': None
-                })
+            boards.append({
+                'id': board_id,
+                'name': board.get('name'),
+                'description': board.get('description', ''),
+                'cover_image': board.get('media', {}).get('image_cover_url') or "https://via.placeholder.com/300x200?text=No+Image",
+                'sections': section_previews if section_previews else None
+            })
 
         return render_template_string(DASHBOARD_TEMPLATE, user_info=user_info, boards=boards)
     except Exception as e:
@@ -108,6 +93,7 @@ def privacy():
 def test():
     return "✅ Test route working!"
 
+# HTML Template with ⚚ dropdown trigger
 DASHBOARD_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
@@ -130,7 +116,7 @@ DASHBOARD_TEMPLATE = """
             text-shadow: 1px 1px #ccc;
         }
         .catalogue {
-            background: rgba(255, 240, 240, 0.85);
+            background: rgba(255, 240, 240, 0.8);
             border: 2px dashed #b30059;
             padding: 20px;
             border-radius: 12px;
@@ -139,6 +125,7 @@ DASHBOARD_TEMPLATE = """
         }
         .board-card {
             margin-bottom: 30px;
+            position: relative;
         }
         .card {
             border: none;
@@ -154,6 +141,36 @@ DASHBOARD_TEMPLATE = """
             border-radius: 10px;
             margin: 5px;
         }
+        .dropdown-trigger {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            font-size: 26px;
+            cursor: pointer;
+            user-select: none;
+        }
+        .dropdown-menu {
+            position: absolute;
+            top: 45px;
+            right: 15px;
+            background: rgba(255,255,255,0.9);
+            border: 1px solid #b30059;
+            border-radius: 8px;
+            padding: 10px;
+            z-index: 10;
+            display: none;
+        }
+        .dropdown-menu.show {
+            display: block;
+        }
+        .dropdown-menu li {
+            list-style: none;
+            padding: 6px 0;
+        }
+        .dropdown-menu li:hover {
+            background: #ffd6e6;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -168,6 +185,7 @@ DASHBOARD_TEMPLATE = """
                 <li>🧠 Build psychological profiles</li>
                 <li>🧚‍♀️ Create board personas</li>
                 <li>📌 Get personalized vibe insights</li>
+                <li>💬 Talk to My Board</li>
             </ul>
         </div>
 
@@ -176,6 +194,16 @@ DASHBOARD_TEMPLATE = """
             {% for board in boards %}
             <div class="col-md-4 board-card">
                 <div class="card">
+                    <div class="dropdown-trigger" onclick="toggleDropdown('{{ board['id'] }}')">⚚</div>
+                    <ul class="dropdown-menu" id="dropdown-{{ board['id'] }}">
+                        <li>🎨 Theme & Color Analysis</li>
+                        <li>🧠 Psychological Profile</li>
+                        <li>🧚‍♀️ Generate Board Persona</li>
+                        <li>🧭 Vibe Insights</li>
+                        <li>💬 Talk to My Board</li>
+                        <li>🗺️ Content Overlap Map (coming soon)</li>
+                        <li>📄 Export Board Report</li>
+                    </ul>
                     <img src="{{ board['cover_image'] }}" class="card-img-top" alt="Board Cover">
                     <div class="card-body">
                         <h5 class="card-title">{{ board['name'] }}</h5>
@@ -189,13 +217,20 @@ DASHBOARD_TEMPLATE = """
                         {% elif board['description'] %}
                             <p class="card-text">{{ board['description'] }}</p>
                         {% endif %}
-                        <a href="https://www.pinterest.com/{{ board['id'] }}" class="btn btn-outline-dark mt-2" target="_blank">View Board</a>
+                        <a href="https://www.pinterest.com/board/{{ board['id'] }}" class="btn btn-outline-dark mt-2" target="_blank">View Board</a>
                     </div>
                 </div>
             </div>
             {% endfor %}
         </div>
     </div>
+
+    <script>
+        function toggleDropdown(boardId) {
+            const el = document.getElementById('dropdown-' + boardId);
+            el.classList.toggle('show');
+        }
+    </script>
 </body>
 </html>
 """
