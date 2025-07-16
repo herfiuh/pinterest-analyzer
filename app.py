@@ -13,19 +13,9 @@ AUTHORIZATION_BASE_URL = 'https://www.pinterest.com/oauth/'
 TOKEN_URL = 'https://api.pinterest.com/v5/oauth/token'
 SCOPE = ['boards:read', 'pins:read']
 
-# Safely pick the best image
-def pick_best_image(media_dict):
-    for size in ('original', 'large', 'medium', 'small'):
-        if media_dict.get(size, {}).get('url'):
-            return media_dict[size]['url']
-    for item in media_dict.values():
-        if isinstance(item, dict) and item.get('url'):
-            return item['url']
-    return "https://via.placeholder.com/150x100?text=No+Image"
-
 @app.route('/')
 def home():
-    return render_template_string(LANDING_TEMPLATE)
+    return render_template_string(HOME_TEMPLATE)
 
 @app.route('/login', methods=['GET'])
 def login():
@@ -52,99 +42,110 @@ def callback():
 @app.route('/dashboard')
 def dashboard():
     token = session.get('oauth_token')
-    if not token: return redirect('/')
+    if not token:
+        return redirect('/login')
 
     pinterest = OAuth2Session(CLIENT_ID, token=token)
+
     try:
-        user = pinterest.get('https://api.pinterest.com/v5/user_account').json()
-        boards_raw = pinterest.get('https://api.pinterest.com/v5/boards').json().get('items', [])
+        user_info = pinterest.get('https://api.pinterest.com/v5/user_account').json()
+        boards_resp = pinterest.get('https://api.pinterest.com/v5/boards')
+        boards_data = boards_resp.json().get('items', [])
+
         boards = []
+        for board in boards_data:
+            board_id = board['id']
+            section_resp = pinterest.get(f'https://api.pinterest.com/v5/boards/{board_id}/sections')
+            sections = section_resp.json().get('items', [])
 
-        for b in boards_raw:
-            b_id = b['id']
-            sections_raw = pinterest.get(f'https://api.pinterest.com/v5/boards/{b_id}/sections').json().get('items', [])
             section_previews = []
-
-            for s in sections_raw:
-                pins = pinterest.get(
-                    f'https://api.pinterest.com/v5/boards/{b_id}/sections/{s["id"]}/pins'
-                ).json().get('items', [])
-                img = pick_best_image(pins[0].get('media', {}).get('images', {})) if pins else "https://via.placeholder.com/150x100?text=No+Image"
-                section_previews.append({'id': s['id'], 'image': img})
+            for section in sections:
+                sec_id = section.get('id')
+                pin_resp = pinterest.get(f'https://api.pinterest.com/v5/boards/{board_id}/sections/{sec_id}/pins')
+                pins = pin_resp.json().get('items', [])
+                image_url = pins[0]['media']['images'].get('original', {}).get('url') if pins else None
+                section_previews.append({
+                    'id': sec_id,
+                    'image': image_url or "https://via.placeholder.com/150x100?text=No+Image"
+                })
 
             boards.append({
-                'id': b_id,
-                'name': b.get('name'),
-                'cover_image': pick_best_image(b.get('media', {}).get('images', {})),
-                'sections': section_previews or None,
-                'description': b.get('description', '')
+                'id': board_id,
+                'name': board.get('name'),
+                'description': board.get('description', ''),
+                'cover_image': board.get('media', {}).get('image_cover_url') or "https://via.placeholder.com/300x200?text=No+Image",
+                'sections': section_previews
             })
 
-        return render_template_string(DASHBOARD_TEMPLATE, user=user, boards=boards)
-
+        return render_template_string(DASHBOARD_TEMPLATE, user_info=user_info, boards=boards)
     except Exception as e:
         return f"<h3>❌ Failed to load dashboard:</h3><pre>{str(e)}</pre>"
 
 @app.route('/privacy')
 def privacy():
-    return redirect("https://www.termsfeed.com/live/90026cd3-68b4-415e-b50a-f7420791857c")
+    return """
+    <h1>Privacy Policy</h1>
+    <p>This app uses Pinterest API to analyze boards with user permission. We do not permanently store personal data.</p>
+    <p>You can view the full policy <a href="https://www.termsfeed.com/live/90026cd3-68b4-415e-b50a-f7420791857c" target="_blank">here</a>.</p>
+    """
 
 @app.route('/test')
-def test(): return "✅ App is working!"
+def test():
+    return "✅ Test route working!"
 
-# === Landing Page Template ===
-LANDING_TEMPLATE = """
+# === Templates ===
+
+HOME_TEMPLATE = """
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>p!nlyzer</title>
     <link href="https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap" rel="stylesheet">
     <style>
         body {
-            margin: 0;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
             background-color: #ffe6e6;
             font-family: 'Great Vibes', cursive;
             color: #4b0000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            text-align: center;
         }
-        .logo {
-            font-size: 72px;
+        h1 {
+            font-size: 64px;
             margin-bottom: 40px;
-            text-shadow: 2px 2px #ccc;
+            text-shadow: 1px 1px #fff0f5;
         }
-        .btn-login {
-            background: #800020;
-            color: white;
-            padding: 15px 30px;
-            font-size: 32px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
+        a.login-btn {
+            font-size: 24px;
+            padding: 14px 30px;
+            background-color: #ffccd5;
+            color: #4b0000;
+            border: 2px solid #b30059;
+            border-radius: 12px;
+            text-decoration: none;
         }
-        .btn-login:hover {
-            background: #a00030;
+        a.login-btn:hover {
+            background-color: #f5b5c0;
         }
     </style>
 </head>
 <body>
-    <div class="logo">p!nlyzer</div>
-    <button onclick="location.href='/login'" class="btn-login">Log in with Pinterest</button>
+    <h1>p!nlyzer</h1>
+    <a class="login-btn" href="/login">Log in with Pinterest</a>
 </body>
 </html>
 """
 
-# === Dashboard Template ===
 DASHBOARD_TEMPLATE = """
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Dashboard - p!nlyzer</title>
+    <title>p!nlyzer Dashboard</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap" rel="stylesheet">
     <style>
@@ -156,7 +157,6 @@ DASHBOARD_TEMPLATE = """
         }
         .logo {
             font-size: 48px;
-            font-weight: bold;
             margin-bottom: 20px;
             text-shadow: 1px 1px #ccc;
         }
@@ -178,26 +178,21 @@ DASHBOARD_TEMPLATE = """
             box-shadow: 0 4px 10px rgba(0,0,0,0.1);
             position: relative;
         }
-        .card-title {
-            font-size: 24px;
-        }
         .section-img {
             height: 100px;
             border-radius: 10px;
             margin: 5px;
         }
-        .brand-button {
+        .feature-button {
             position: absolute;
             top: 10px;
             right: 12px;
             font-size: 24px;
-            background: none;
-            border: none;
             cursor: pointer;
-            color: #800020;
         }
-        .brand-button:hover {
-            color: #b30059;
+        .dropdown-menu {
+            font-family: Arial, sans-serif;
+            font-size: 14px;
         }
     </style>
 </head>
@@ -213,7 +208,8 @@ DASHBOARD_TEMPLATE = """
                 <li>🧠 Build psychological profiles</li>
                 <li>🧚‍♀️ Create board personas</li>
                 <li>📌 Get personalized vibe insights</li>
-                <li>💬 Talk to your board</li>
+                <li>🗣 Talk to your board</li>
+                <li>🧭 Content overlap <em>(coming soon)</em></li>
             </ul>
         </div>
 
@@ -222,7 +218,18 @@ DASHBOARD_TEMPLATE = """
             {% for board in boards %}
             <div class="col-md-4 board-card">
                 <div class="card">
-                    <button class="brand-button" title="Open features">⚚</button>
+                    <div class="feature-button dropdown">
+                        <span data-bs-toggle="dropdown" aria-expanded="false">⚚</span>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="#">Analyze Theme</a></li>
+                            <li><a class="dropdown-item" href="#">Analyze Color</a></li>
+                            <li><a class="dropdown-item" href="#">Board Vibe</a></li>
+                            <li><a class="dropdown-item" href="#">Talk to My Board</a></li>
+                            <li><a class="dropdown-item" href="#">Board Persona</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item disabled" href="#">Content Overlap (coming soon)</a></li>
+                        </ul>
+                    </div>
                     <img src="{{ board['cover_image'] }}" class="card-img-top" alt="Board Cover">
                     <div class="card-body">
                         <h5 class="card-title">{{ board['name'] }}</h5>
@@ -230,24 +237,24 @@ DASHBOARD_TEMPLATE = """
                             <div>
                                 <p style="font-size: 18px;">Sections:</p>
                                 {% for section in board['sections'] %}
-                                    <img src="{{ section['image'] }}" class="section-img" alt="Section">
+                                    <img src="{{ section['image'] }}" class="section-img" alt="Section Image">
                                 {% endfor %}
                             </div>
                         {% elif board['description'] %}
                             <p class="card-text">{{ board['description'] }}</p>
                         {% endif %}
-                        <a href="https://www.pinterest.com/board/{{ board['id'] }}" class="btn btn-outline-dark mt-2" target="_blank">View Board</a>
                     </div>
                 </div>
             </div>
             {% endfor %}
         </div>
     </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
 """
 
-# === Run the App ===
 if __name__ == "__main__":
     app.run(debug=True)
 
