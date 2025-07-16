@@ -13,12 +13,19 @@ AUTHORIZATION_BASE_URL = 'https://www.pinterest.com/oauth/'
 TOKEN_URL = 'https://api.pinterest.com/v5/oauth/token'
 SCOPE = ['boards:read', 'pins:read']
 
+# Safely pick the best image
+def pick_best_image(media_dict):
+    for size in ('original', 'large', 'medium', 'small'):
+        if media_dict.get(size, {}).get('url'):
+            return media_dict[size]['url']
+    for item in media_dict.values():
+        if isinstance(item, dict) and item.get('url'):
+            return item['url']
+    return "https://via.placeholder.com/150x100?text=No+Image"
+
 @app.route('/')
 def home():
-    return """
-        <h2>Welcome to the Pinterest Analyzer</h2>
-        <a href='/login'>Login with Pinterest</a>
-    """
+    return render_template_string(LANDING_TEMPLATE)
 
 @app.route('/login', methods=['GET'])
 def login():
@@ -45,61 +52,99 @@ def callback():
 @app.route('/dashboard')
 def dashboard():
     token = session.get('oauth_token')
-    if not token:
-        return redirect('/login')
+    if not token: return redirect('/')
 
     pinterest = OAuth2Session(CLIENT_ID, token=token)
-
     try:
-        user_info = pinterest.get('https://api.pinterest.com/v5/user_account').json()
-        boards_resp = pinterest.get('https://api.pinterest.com/v5/boards')
-        boards_data = boards_resp.json().get('items', [])
-
+        user = pinterest.get('https://api.pinterest.com/v5/user_account').json()
+        boards_raw = pinterest.get('https://api.pinterest.com/v5/boards').json().get('items', [])
         boards = []
-        for board in boards_data:
-            board_id = board['id']
-            section_resp = pinterest.get(f'https://api.pinterest.com/v5/boards/{board_id}/sections')
-            sections = section_resp.json().get('items', [])
 
+        for b in boards_raw:
+            b_id = b['id']
+            sections_raw = pinterest.get(f'https://api.pinterest.com/v5/boards/{b_id}/sections').json().get('items', [])
             section_previews = []
-            for section in sections:
-                sec_id = section.get('id')
-                pin_resp = pinterest.get(f'https://api.pinterest.com/v5/boards/{board_id}/sections/{sec_id}/pins')
-                pins = pin_resp.json().get('items', [])
-                img = pins[0]['media']['images']['original']['url'] if pins else "https://via.placeholder.com/150x100?text=No+Image"
-                section_previews.append({'id': sec_id, 'image': img})
+
+            for s in sections_raw:
+                pins = pinterest.get(
+                    f'https://api.pinterest.com/v5/boards/{b_id}/sections/{s["id"]}/pins'
+                ).json().get('items', [])
+                img = pick_best_image(pins[0].get('media', {}).get('images', {})) if pins else "https://via.placeholder.com/150x100?text=No+Image"
+                section_previews.append({'id': s['id'], 'image': img})
 
             boards.append({
-                'id': board_id,
-                'name': board.get('name'),
-                'description': board.get('description', ''),
-                'cover_image': board.get('media', {}).get('image_cover_url') or "https://via.placeholder.com/300x200?text=No+Image",
-                'sections': section_previews if section_previews else None
+                'id': b_id,
+                'name': b.get('name'),
+                'cover_image': pick_best_image(b.get('media', {}).get('images', {})),
+                'sections': section_previews or None,
+                'description': b.get('description', '')
             })
 
-        return render_template_string(DASHBOARD_TEMPLATE, user_info=user_info, boards=boards)
+        return render_template_string(DASHBOARD_TEMPLATE, user=user, boards=boards)
+
     except Exception as e:
         return f"<h3>❌ Failed to load dashboard:</h3><pre>{str(e)}</pre>"
 
 @app.route('/privacy')
 def privacy():
-    return """
-    <h1>Privacy Policy</h1>
-    <p>This app uses Pinterest API to analyze boards with user permission. We do not permanently store personal data.</p>
-    <p>You can view the full policy <a href="https://www.termsfeed.com/live/90026cd3-68b4-415e-b50a-f7420791857c" target="_blank">here</a>.</p>
-    """
+    return redirect("https://www.termsfeed.com/live/90026cd3-68b4-415e-b50a-f7420791857c")
 
 @app.route('/test')
-def test():
-    return "✅ Test route working!"
+def test(): return "✅ App is working!"
 
-# HTML Template with ⚚ dropdown trigger
-DASHBOARD_TEMPLATE = """
+# === Landing Page Template ===
+LANDING_TEMPLATE = """
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
     <meta charset="UTF-8">
-    <title>p!nlyzer Dashboard</title>
+    <title>p!nlyzer</title>
+    <link href="https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background-color: #ffe6e6;
+            font-family: 'Great Vibes', cursive;
+            color: #4b0000;
+        }
+        .logo {
+            font-size: 72px;
+            margin-bottom: 40px;
+            text-shadow: 2px 2px #ccc;
+        }
+        .btn-login {
+            background: #800020;
+            color: white;
+            padding: 15px 30px;
+            font-size: 32px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        .btn-login:hover {
+            background: #a00030;
+        }
+    </style>
+</head>
+<body>
+    <div class="logo">p!nlyzer</div>
+    <button onclick="location.href='/login'" class="btn-login">Log in with Pinterest</button>
+</body>
+</html>
+"""
+
+# === Dashboard Template ===
+DASHBOARD_TEMPLATE = """
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard - p!nlyzer</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap" rel="stylesheet">
     <style>
@@ -125,13 +170,13 @@ DASHBOARD_TEMPLATE = """
         }
         .board-card {
             margin-bottom: 30px;
-            position: relative;
         }
         .card {
             border: none;
             border-radius: 12px;
             background-color: #fff0f5;
             box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            position: relative;
         }
         .card-title {
             font-size: 24px;
@@ -141,35 +186,18 @@ DASHBOARD_TEMPLATE = """
             border-radius: 10px;
             margin: 5px;
         }
-        .dropdown-trigger {
+        .brand-button {
             position: absolute;
             top: 10px;
-            right: 15px;
-            font-size: 26px;
+            right: 12px;
+            font-size: 24px;
+            background: none;
+            border: none;
             cursor: pointer;
-            user-select: none;
+            color: #800020;
         }
-        .dropdown-menu {
-            position: absolute;
-            top: 45px;
-            right: 15px;
-            background: rgba(255,255,255,0.9);
-            border: 1px solid #b30059;
-            border-radius: 8px;
-            padding: 10px;
-            z-index: 10;
-            display: none;
-        }
-        .dropdown-menu.show {
-            display: block;
-        }
-        .dropdown-menu li {
-            list-style: none;
-            padding: 6px 0;
-        }
-        .dropdown-menu li:hover {
-            background: #ffd6e6;
-            cursor: pointer;
+        .brand-button:hover {
+            color: #b30059;
         }
     </style>
 </head>
@@ -185,7 +213,7 @@ DASHBOARD_TEMPLATE = """
                 <li>🧠 Build psychological profiles</li>
                 <li>🧚‍♀️ Create board personas</li>
                 <li>📌 Get personalized vibe insights</li>
-                <li>💬 Talk to My Board</li>
+                <li>💬 Talk to your board</li>
             </ul>
         </div>
 
@@ -194,16 +222,7 @@ DASHBOARD_TEMPLATE = """
             {% for board in boards %}
             <div class="col-md-4 board-card">
                 <div class="card">
-                    <div class="dropdown-trigger" onclick="toggleDropdown('{{ board['id'] }}')">⚚</div>
-                    <ul class="dropdown-menu" id="dropdown-{{ board['id'] }}">
-                        <li>🎨 Theme & Color Analysis</li>
-                        <li>🧠 Psychological Profile</li>
-                        <li>🧚‍♀️ Generate Board Persona</li>
-                        <li>🧭 Vibe Insights</li>
-                        <li>💬 Talk to My Board</li>
-                        <li>🗺️ Content Overlap Map (coming soon)</li>
-                        <li>📄 Export Board Report</li>
-                    </ul>
+                    <button class="brand-button" title="Open features">⚚</button>
                     <img src="{{ board['cover_image'] }}" class="card-img-top" alt="Board Cover">
                     <div class="card-body">
                         <h5 class="card-title">{{ board['name'] }}</h5>
@@ -211,7 +230,7 @@ DASHBOARD_TEMPLATE = """
                             <div>
                                 <p style="font-size: 18px;">Sections:</p>
                                 {% for section in board['sections'] %}
-                                    <img src="{{ section['image'] }}" class="section-img" alt="Section Image">
+                                    <img src="{{ section['image'] }}" class="section-img" alt="Section">
                                 {% endfor %}
                             </div>
                         {% elif board['description'] %}
@@ -224,17 +243,11 @@ DASHBOARD_TEMPLATE = """
             {% endfor %}
         </div>
     </div>
-
-    <script>
-        function toggleDropdown(boardId) {
-            const el = document.getElementById('dropdown-' + boardId);
-            el.classList.toggle('show');
-        }
-    </script>
 </body>
 </html>
 """
 
+# === Run the App ===
 if __name__ == "__main__":
     app.run(debug=True)
 
