@@ -5,4 +5,3 @@ colorthief==0.2.1
 reportlab==3.6.13
 nltk==3.8.1
 Pillow==9.5.0
-
