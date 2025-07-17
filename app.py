@@ -1,3 +1,4 @@
+# --- app.py (updated) ---
 from flask import Flask, redirect, request, session, render_template_string, jsonify, send_file
 from requests_oauthlib import OAuth2Session
 import os
@@ -9,13 +10,11 @@ from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 import nltk
 from nltk.sentiment import SentimentIntensityAnalyzer
-import threading
+from collections import Counter
+import random
 
 # --- For AI image captioning stub ---
-# You can replace this with actual AI model calls later
 def generate_image_caption(image_url):
-    # Placeholder caption generation
-    # In reality, use open source models like BLIP or others to caption image
     captions = [
         "A cozy living room with pastel colors",
         "Fashion outfit with floral prints",
@@ -23,7 +22,6 @@ def generate_image_caption(image_url):
         "Outdoor nature scene with trees and sunlight",
         "Modern kitchen with stainless steel appliances"
     ]
-    import random
     return random.choice(captions)
 
 # --- Setup NLP ---
@@ -41,13 +39,14 @@ AUTHORIZATION_BASE_URL = 'https://www.pinterest.com/oauth/'
 TOKEN_URL = 'https://api.pinterest.com/v5/oauth/token'
 SCOPE = ['boards:read', 'pins:read']
 
-# Store chat history in session
+# --- Session chat ---
 def get_chat_history():
     return session.setdefault('chat_history', [])
 
 def clear_chat_history():
     session['chat_history'] = []
 
+# --- Routes ---
 @app.route('/')
 def home():
     return render_template_string(LANDING_PAGE_TEMPLATE)
@@ -81,7 +80,6 @@ def dashboard():
         return redirect('/login')
 
     pinterest = OAuth2Session(CLIENT_ID, token=token)
-
     try:
         user_info = pinterest.get('https://api.pinterest.com/v5/user_account').json()
         boards_resp = pinterest.get('https://api.pinterest.com/v5/boards')
@@ -90,14 +88,10 @@ def dashboard():
         boards = []
         for board in boards_data:
             board_id = board['id']
-            # Get pins for board
             pins_resp = pinterest.get(f'https://api.pinterest.com/v5/boards/{board_id}/pins')
             pins = pins_resp.json().get('items', [])
-
-            # Generate cover image from first pin's image or placeholder
             if pins:
-                first_pin = pins[0]
-                cover_image = first_pin['media']['images']['original']['url']
+                cover_image = pins[0]['media']['images']['original']['url']
             else:
                 cover_image = "https://via.placeholder.com/300x200?text=No+Image"
 
@@ -106,17 +100,15 @@ def dashboard():
                 'name': board.get('name'),
                 'description': board.get('description', ''),
                 'cover_image': cover_image,
-                'pins': pins  # pass pins for backend analysis
+                'pins': pins
             })
 
-        session['boards'] = boards  # Store for backend access
-
+        session['boards'] = boards
         return render_template_string(DASHBOARD_TEMPLATE, user_info=user_info, boards=boards)
     except Exception as e:
         return f"<h3>❌ Failed to load dashboard:</h3><pre>{str(e)}</pre>"
 
 # --- Feature endpoints ---
-
 @app.route('/feature/analyze_theme_color/<board_id>')
 def analyze_theme_color(board_id):
     boards = session.get('boards', [])
@@ -125,27 +117,22 @@ def analyze_theme_color(board_id):
         return jsonify({'error': 'Board not found'}), 404
 
     color_counts = {}
-    total_pins = len(board['pins'])
     for pin in board['pins']:
         try:
             img_url = pin['media']['images']['original']['url']
             resp = requests.get(img_url)
-            img = Image.open(io.BytesIO(resp.content))
             color_thief = ColorThief(io.BytesIO(resp.content))
             dominant_color = color_thief.get_color(quality=1)
-            # convert to hex
             hex_color = '#%02x%02x%02x' % dominant_color
             color_counts[hex_color] = color_counts.get(hex_color, 0) + 1
         except Exception:
             continue
 
-    # sort by frequency
     sorted_colors = sorted(color_counts.items(), key=lambda x: x[1], reverse=True)
-    result = {
-        'total_pins': total_pins,
+    return jsonify({
+        'total_pins': len(board['pins']),
         'dominant_colors': sorted_colors[:5]
-    }
-    return jsonify(result)
+    })
 
 @app.route('/feature/psych_profile/<board_id>')
 def psych_profile(board_id):
@@ -154,36 +141,22 @@ def psych_profile(board_id):
     if not board:
         return jsonify({'error': 'Board not found'}), 404
 
-    # Aggregate descriptions and captions
     texts = []
     for pin in board['pins']:
         desc = pin.get('description')
         if desc:
             texts.append(desc)
         else:
-            # generate caption stub
             img_url = pin['media']['images']['original']['url']
-            caption = generate_image_caption(img_url)
-            texts.append(caption)
+            texts.append(generate_image_caption(img_url))
 
     full_text = ' '.join(texts)
-
-    # Sentiment analysis
     sentiment = sia.polarity_scores(full_text)
+    mood = ("Positive and upbeat" if sentiment['compound'] > 0.3 else
+            "Reflective and somber" if sentiment['compound'] < -0.3 else
+            "Neutral and balanced")
 
-    # Simple psych profile based on sentiment
-    if sentiment['compound'] > 0.3:
-        mood = "Positive and upbeat"
-    elif sentiment['compound'] < -0.3:
-        mood = "Reflective and somber"
-    else:
-        mood = "Neutral and balanced"
-
-    profile = {
-        'summary': mood,
-        'sentiment_scores': sentiment
-    }
-    return jsonify(profile)
+    return jsonify({'summary': mood, 'sentiment_scores': sentiment})
 
 @app.route('/feature/generate_persona/<board_id>')
 def generate_persona(board_id):
@@ -192,29 +165,30 @@ def generate_persona(board_id):
     if not board:
         return jsonify({'error': 'Board not found'}), 404
 
-    # Very basic persona generation using keywords from pins
     keywords = []
     for pin in board['pins']:
         desc = pin.get('description')
         if desc:
             keywords.extend(desc.lower().split())
 
-    # Simple frequency count
-    from collections import Counter
     freq = Counter(keywords)
     common_words = [w for w, c in freq.most_common(10) if len(w) > 3]
-
-    persona = f"This board likely belongs to someone interested in: {', '.join(common_words)}."
-    return jsonify({'persona': persona})
+    return jsonify({'persona': f"This board likely belongs to someone interested in: {', '.join(common_words)}."})
 
 @app.route('/feature/vibe_insights/<board_id>')
 def vibe_insights(board_id):
-    # Combining color and psych to give a vibe summary
-    color_data = analyze_theme_color(board_id).json[0]
-    profile_data = psych_profile(board_id).json[0]
+    boards = session.get('boards', [])
+    board = next((b for b in boards if b['id'] == board_id), None)
+    if not board:
+        return jsonify({'error': 'Board not found'}), 404
+
+    color_data_resp = analyze_theme_color(board_id)
+    color_data = color_data_resp.get_json().get('dominant_colors', [])
+
+    profile_data_resp = psych_profile(board_id)
+    profile_data = profile_data_resp.get_json()
 
     vibe = "This board gives off a "
-    # Simplified logic
     if profile_data['summary'] == "Positive and upbeat":
         vibe += "vibrant and cheerful vibe."
     elif profile_data['summary'] == "Reflective and somber":
@@ -222,28 +196,24 @@ def vibe_insights(board_id):
     else:
         vibe += "balanced and neutral vibe."
 
-    vibe += f" Dominant colors include {', '.join([c for c, _ in color_data])}."
+    colors = ', '.join([c for c, _ in color_data])
+    if colors:
+        vibe += f" Dominant colors include {colors}."
 
     return jsonify({'vibe': vibe})
 
 @app.route('/feature/talk_to_my_board/<board_id>', methods=['GET', 'POST'])
 def talk_to_my_board(board_id):
     if request.method == 'GET':
-        history = get_chat_history()
-        return jsonify({'history': history})
+        return jsonify({'history': get_chat_history()})
 
-    data = request.json
-    user_msg = data.get('message', '')
+    user_msg = request.json.get('message', '')
     if not user_msg:
         return jsonify({'error': 'No message sent'}), 400
 
-    # Basic echo with "AI" reply placeholder
     history = get_chat_history()
     history.append({'role': 'user', 'message': user_msg})
-
-    # Fake AI reply - in real life would integrate AI model + context from board data
     reply = f"🤖 [AI Reply to '{user_msg}'] Sorry, feature under construction."
-
     history.append({'role': 'bot', 'message': reply})
     session['chat_history'] = history
     return jsonify({'reply': reply, 'history': history})
@@ -260,29 +230,24 @@ def export_report(board_id):
     if not board:
         return "<h3>❌ Board not found</h3>", 404
 
-    # Generate PDF report with simple text + colors
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=letter)
     c.setFont("Helvetica-Bold", 20)
     c.drawString(72, 750, f"Board Report: {board['name']}")
-
-    # Theme & color summary stub
     c.setFont("Helvetica", 12)
     c.drawString(72, 720, "Theme & Color Analysis:")
-    color_analysis = analyze_theme_color(board_id).json
-    if color_analysis:
-        y = 700
-        for color, count in color_analysis.get('dominant_colors', []):
-            c.setFillColorRGB(*tuple(int(color.lstrip('#')[i:i+2], 16)/255 for i in (0, 2, 4)))
-            c.rect(72, y, 50, 20, fill=True, stroke=False)
-            c.setFillColorRGB(0,0,0)
-            c.drawString(130, y+5, f"{color} ({count} pins)")
-            y -= 30
 
-    # Finalize PDF
+    color_analysis = analyze_theme_color(board_id).get_json()
+    y = 700
+    for color, count in color_analysis.get('dominant_colors', []):
+        c.setFillColorRGB(*[int(color.lstrip('#')[i:i+2], 16)/255 for i in (0, 2, 4)])
+        c.rect(72, y, 50, 20, fill=True, stroke=False)
+        c.setFillColorRGB(0, 0, 0)
+        c.drawString(130, y+5, f"{color} ({count} pins)")
+        y -= 30
+
     c.save()
     buffer.seek(0)
-
     return send_file(buffer, as_attachment=True, download_name=f"{board['name']}_report.pdf", mimetype='application/pdf')
 
 
