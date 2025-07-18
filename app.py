@@ -1,4 +1,4 @@
-from flask import Flask, redirect, request, session, render_template_string, jsonify
+from flask import Flask, redirect, request, session, render_template_string
 from requests_oauthlib import OAuth2Session
 import os
 
@@ -54,71 +54,29 @@ def dashboard():
 
         boards = []
         for board in boards_data:
+            board_id = board['id']
+            section_resp = pinterest.get(f'https://api.pinterest.com/v5/boards/{board_id}/sections')
+            sections = section_resp.json().get('items', [])
+
+            section_previews = []
+            for section in sections:
+                sec_id = section.get('id')
+                pin_resp = pinterest.get(f'https://api.pinterest.com/v5/boards/{board_id}/sections/{sec_id}/pins')
+                pins = pin_resp.json().get('items', [])
+                image_url = pins[0]['media']['images'].get('original', {}).get('url') if pins else "https://via.placeholder.com/100x100?text=No+Image"
+                section_previews.append({'id': sec_id, 'image': image_url})
+
             boards.append({
-                'id': board['id'],
+                'id': board_id,
                 'name': board.get('name'),
                 'description': board.get('description', ''),
-                'cover_image': board.get('media', {}).get('image_cover_url') or "https://via.placeholder.com/300x200?text=No+Image"
+                'cover_image': board.get('media', {}).get('image_cover_url') or "https://via.placeholder.com/300x200?text=No+Image",
+                'sections': section_previews
             })
 
         return render_template_string(DASHBOARD_TEMPLATE, user_info=user_info, boards=boards)
     except Exception as e:
         return f"<h3>❌ Failed to load dashboard:</h3><pre>{str(e)}</pre>"
-
-# ======= Backend API Endpoints for features =======
-
-# Analyze Theme (colors, general vibe)
-@app.route('/analyze_theme/<board_id>')
-def analyze_theme(board_id):
-    # TODO: implement color analysis and theme extraction logic
-    # Placeholder response
-    return jsonify({
-        'board_id': board_id,
-        'theme_colors': ['#FF6F91', '#FF9671', '#FFC75F'],
-        'description': 'Warm pastel vibes with bright energy',
-    })
-
-# Build Persona (psych profile of board owner from pins)
-@app.route('/build_persona/<board_id>')
-def build_persona(board_id):
-    # TODO: implement psychological profile logic based on pins & boards
-    return jsonify({
-        'board_id': board_id,
-        'persona': {
-            'traits': ['Creative', 'Adventurous', 'Optimistic'],
-            'summary': 'This user enjoys exploring new ideas with a positive outlook.'
-        }
-    })
-
-# Talk to Board (chat-like interaction)
-@app.route('/talk_to_board/<board_id>', methods=['POST'])
-def talk_to_board(board_id):
-    user_message = request.json.get('message', '')
-    # TODO: integrate NLP/AI for chat response based on board content
-    reply = f"Received your message on board {board_id}: {user_message}. (This is a placeholder reply.)"
-    return jsonify({'reply': reply})
-
-# Vibe/Energy Map
-@app.route('/vibe_map/<board_id>')
-def vibe_map(board_id):
-    # TODO: create and return vibe/energy map visualization data
-    return jsonify({
-        'board_id': board_id,
-        'vibe': 'Energetic and creative',
-        'energy_score': 87
-    })
-
-# Pin similarity matrix
-@app.route('/pin_similarity/<board_id>')
-def pin_similarity(board_id):
-    # TODO: calculate similarity matrix for pins on board
-    return jsonify({
-        'board_id': board_id,
-        'similarities': [
-            {'pin1': 'pin123', 'pin2': 'pin456', 'score': 0.85},
-            {'pin1': 'pin789', 'pin2': 'pin101', 'score': 0.75}
-        ]
-    })
 
 @app.route('/privacy')
 def privacy():
@@ -214,21 +172,22 @@ DASHBOARD_TEMPLATE = """
             font-family: Arial, sans-serif;
             font-size: 14px;
         }
-        img.card-img-top {
-            border-radius: 15px 15px 0 0;
+        .section-img {
+            width: 80px;
+            height: 80px;
+            border-radius: 10px;
             object-fit: cover;
-            height: 200px;
-            width: 100%;
+            margin: 5px;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="logo">p⚚nlyze</div>
+        <div class="logo">p!nlyzer</div>
 
         <div class="catalogue">
             <h2>p⚚nlyze</h2>
-            <p>Select a board to:</p>
+            <p>Select a board or section to:</p>
             <ul style="list-style: none; padding-left: 0;">
                 <li>🎨 Analyze board themes & colors</li>
                 <li>🧠 Build psychological profiles</li>
@@ -247,59 +206,34 @@ DASHBOARD_TEMPLATE = """
                     <div class="dropdown">
                         <span class="feature-btn dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">⚚</span>
                         <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="#" onclick="triggerFeature('analyze_theme', '{{ board.id }}')">Analyze Theme</a></li>
-                            <li><a class="dropdown-item" href="#" onclick="triggerFeature('build_persona', '{{ board.id }}')">Build Persona</a></li>
-                            <li><a class="dropdown-item" href="#" onclick="triggerFeature('talk_to_board', '{{ board.id }}')">Talk to Board</a></li>
-                            <li><a class="dropdown-item" href="#" onclick="triggerFeature('vibe_map', '{{ board.id }}')">Vibe/Energy Map</a></li>
-                            <li><a class="dropdown-item" href="#" onclick="triggerFeature('pin_similarity', '{{ board.id }}')">Pin Similarity Matrix</a></li>
+                            <li><a class="dropdown-item" href="#">Analyze Theme</a></li>
+                            <li><a class="dropdown-item" href="#">Build Persona</a></li>
+                            <li><a class="dropdown-item" href="#">Talk to Board</a></li>
                         </ul>
                     </div>
-                    <img src="{{ board.cover_image }}" class="card-img-top" alt="Board Cover">
+                    <img src="{{ board['cover_image'] }}" class="card-img-top" alt="Board Cover">
                     <div class="card-body">
-                        <h5 class="card-title">{{ board.name }}</h5>
-                        {% if board.description %}
-                        <p class="card-text">{{ board.description }}</p>
+                        <h5 class="card-title">{{ board['name'] }}</h5>
+                        {% if board['sections'] %}
+                            <div class="d-flex flex-wrap">
+                                {% for section in board['sections'] %}
+                                    <img src="{{ section['image'] }}" class="section-img" alt="Section Image">
+                                {% endfor %}
+                            </div>
+                        {% elif board['description'] %}
+                            <p class="card-text">{{ board['description'] }}</p>
                         {% endif %}
                     </div>
                 </div>
             </div>
             {% endfor %}
         </div>
-
-        <div id="feature-result" class="mt-5"></div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        async function triggerFeature(feature, boardId) {
-            let endpoint = '/' + feature + '/' + boardId;
-            let options = {};
-
-            if(feature === 'talk_to_board') {
-                let message = prompt("Say something to your board:");
-                if(!message) return;
-                options = {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({message})
-                };
-            }
-
-            try {
-                const response = await fetch(endpoint, options);
-                const data = await response.json();
-
-                document.getElementById('feature-result').innerHTML = 
-                    '<h4>Feature: ' + feature.replace(/_/g, ' ') + '</h4><pre>' + JSON.stringify(data, null, 2) + '</pre>';
-            } catch (err) {
-                alert('Error fetching feature data');
-            }
-        }
-    </script>
 </body>
 </html>
 """
 
 if __name__ == "__main__":
     app.run(debug=True)
-
