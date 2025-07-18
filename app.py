@@ -249,12 +249,24 @@ DASHBOARD_TEMPLATE = """
             font-family: 'Great Vibes', cursive;
             color: #4b0000;
             padding: 30px;
+            transition: background-color 0.3s, color 0.3s;
         }
+
+        #toggle-theme {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 999;
+            font-size: 18px;
+            border-radius: 30px;
+        }
+
         .logo {
             font-size: 48px;
             text-shadow: 1px 1px #ccc;
             margin-bottom: 30px;
         }
+
         .catalogue {
             background: rgba(255, 240, 240, 0.85);
             border: 2px dashed #b30059;
@@ -262,14 +274,18 @@ DASHBOARD_TEMPLATE = """
             border-radius: 12px;
             margin-bottom: 50px;
             text-align: center;
+            transition: background-color 0.3s, border 0.3s;
         }
+
         .board-card .card {
             background-color: #fff0f5;
             border: none;
             border-radius: 15px;
             box-shadow: 0 4px 8px rgba(0,0,0,0.1);
             position: relative;
+            transition: background-color 0.3s, color 0.3s;
         }
+
         .feature-btn {
             position: absolute;
             top: 10px;
@@ -281,10 +297,12 @@ DASHBOARD_TEMPLATE = """
             cursor: pointer;
             border: 1px solid #ccc;
         }
+
         .dropdown-menu {
             font-family: Arial, sans-serif;
             font-size: 14px;
         }
+
         img.card-img-top {
             border-radius: 15px 15px 0 0;
             object-fit: cover;
@@ -294,10 +312,12 @@ DASHBOARD_TEMPLATE = """
     </style>
 </head>
 <body>
+    <button id="toggle-theme" class="btn btn-sm btn-outline-dark">🌙</button>
+
     <div class="container">
         <div class="logo">p!nlyzer</div>
 
-        <div class="catalogue">
+        <div class="catalogue" id="catalogue-box">
             <h2>p⚚nlyze</h2>
             <p>Select a board to:</p>
             <ul style="list-style: none; padding-left: 0;">
@@ -346,30 +366,51 @@ DASHBOARD_TEMPLATE = """
             let endpoint = '/' + feature + '/' + boardId;
             let options = {};
 
-            if(feature === 'talk_to_board') {
+            if (feature === 'talk_to_board') {
                 let message = prompt("Say something to your board:");
-                if(!message) return;
+                if (!message) return;
                 options = {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({message})
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message })
                 };
             }
 
             try {
                 const response = await fetch(endpoint, options);
                 const data = await response.json();
-
-                document.getElementById('feature-result').innerHTML = 
+                document.getElementById('feature-result').innerHTML =
                     '<h4>Feature: ' + feature.replace(/_/g, ' ') + '</h4><pre>' + JSON.stringify(data, null, 2) + '</pre>';
             } catch (err) {
                 alert('Error fetching feature data');
             }
         }
+
+        // === THEME TOGGLE ===
+        const toggleBtn = document.getElementById('toggle-theme');
+        let darkMode = false;
+
+        toggleBtn.addEventListener('click', () => {
+            darkMode = !darkMode;
+            document.body.style.backgroundColor = darkMode ? '#1e1e1e' : '#ffe6e6';
+            document.body.style.color = darkMode ? '#f2f2f2' : '#4b0000';
+            toggleBtn.textContent = darkMode ? '☀️' : '🌙';
+
+            const cards = document.querySelectorAll('.card');
+            cards.forEach(card => {
+                card.style.backgroundColor = darkMode ? '#2e2e2e' : '#fff0f5';
+                card.style.color = darkMode ? '#f2f2f2' : '#4b0000';
+            });
+
+            const catalogue = document.getElementById('catalogue-box');
+            catalogue.style.backgroundColor = darkMode ? '#2e2e2e' : 'rgba(255, 240, 240, 0.85)';
+            catalogue.style.borderColor = darkMode ? '#ff99cc' : '#b30059';
+        });
     </script>
 </body>
 </html>
 """
+
 
 
 if __name__ == "__main__":
