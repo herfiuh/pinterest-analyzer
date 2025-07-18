@@ -1,9 +1,9 @@
---index-url https://download.pytorch.org/whl/cpu
 torch==2.7.1+cpu
-torchvision==0.15.2+cpu
+torchvision==0.22.1+cpu
 torchaudio==2.7.1+cpu
+transformers==4.31.0
 
-Flask
+flask==2.2.5
 requests
 requests-oauthlib
 transformers
