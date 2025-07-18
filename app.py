@@ -35,9 +35,18 @@ def callback():
             authorization_response=request.url
         )
         session['oauth_token'] = token
-        return redirect('/dashboard')
+        return redirect('/onboarding')  # 👈 Go to onboarding instead
     except Exception as e:
         return f"<h3>❌ Error during authentication:</h3><pre>{str(e)}</pre>"
+    
+@app.route('/onboarding')
+def onboarding():
+    return render_template_string(SPIRAL_TEMPLATE)
+
+@app.route('/onboarding_stage2')
+def onboarding_stage2():
+    return render_template_string(ONBOARDING_TEMPLATE)
+
 
 @app.route('/dashboard')
 def dashboard():
@@ -238,6 +247,130 @@ HOME_TEMPLATE = """
 </html>
 """
 
+SPIRAL_TEMPLATE = """
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>p!nlyzer Loading</title>
+    <style>
+        body {
+            margin: 0;
+            background: #ffe6e6;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .spiral {
+            width: 200px;
+            height: 200px;
+            border: 10px solid transparent;
+            border-top: 10px solid #ff99aa;
+            border-right: 10px solid #ffb3c6;
+            border-radius: 50%;
+            animation: spin 3s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg) scale(1); opacity: 1; }
+            50% { transform: rotate(720deg) scale(1.2); opacity: 0.6; }
+            100% { transform: rotate(1440deg) scale(0); opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="spiral"></div>
+
+    <script>
+        setTimeout(() => {
+            window.location.href = '/onboarding_stage2';
+        }, 3000);
+    </script>
+</body>
+</html>
+"""
+
+
+ONBOARDING_TEMPLATE = """
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>welcome to p!nlyzer</title>
+    <link href="https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background: #fff0f5;
+            color: #4b0000;
+            font-family: 'Great Vibes', cursive;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 50px;
+            height: 100vh;
+            text-align: center;
+            animation: fadeIn 2s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        h1 {
+            font-size: 48px;
+            margin-bottom: 30px;
+        }
+
+        p {
+            font-size: 22px;
+            max-width: 800px;
+            margin-bottom: 20px;
+            opacity: 0;
+            animation: fadeIn 1.5s ease forwards;
+        }
+
+        p:nth-of-type(1) { animation-delay: 0.5s; }
+        p:nth-of-type(2) { animation-delay: 1s; }
+        p:nth-of-type(3) { animation-delay: 1.5s; }
+        p:nth-of-type(4) { animation-delay: 2s; }
+
+        .cta-btn {
+            margin-top: 40px;
+            font-size: 20px;
+            background: #ffe6ea;
+            border: 2px solid #b30059;
+            color: #b30059;
+            padding: 12px 24px;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: background 0.3s, color 0.3s;
+            animation: fadeIn 1.5s ease forwards;
+            animation-delay: 2.5s;
+            opacity: 0;
+        }
+
+        .cta-btn:hover {
+            background: #ffccda;
+            color: #800033;
+        }
+    </style>
+</head>
+<body>
+    <h1>welcome, curator ✧˖°</h1>
+
+    <p>what if you could give your board more potential? more power? more reach?</p>
+    <p>what if, you could talk to your boards, or get expert analysis on your curation, or your aesthetic?</p>
+    <p>what if, paired with words, alongside your visual boards, you could manifest faster?</p>
+    <p>or just bask in validation of your expert selection and vibe that your boards radiate?</p>
+
+    <a href="/dashboard" class="cta-btn">I want in!</a>
+</body>
+</html>
+"""
 
 
 DASHBOARD_TEMPLATE = """
