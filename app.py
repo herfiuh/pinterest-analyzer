@@ -362,10 +362,11 @@ ONBOARDING_TEMPLATE = """
 <body>
     <h1>welcome, curator ✧˖°</h1>
 
-    <p>what if you could give your board more potential? more power? more reach?</p>
-    <p>what if, you could talk to your boards, or get expert analysis on your curation, or your aesthetic?</p>
-    <p>what if, paired with words, alongside your visual boards, you could manifest faster?</p>
-    <p>or just bask in validation of your expert selection and vibe that your boards radiate?</p>
+    <p>what if your boards had more potential? more power? more reach?</p>
+    <p>what if you could talk to them — and they talked back?</p>
+    <p>what if expert analysis revealed the hidden patterns behind your pins… your taste… your curation?</p>
+    <p>what if your boards could do more than just inspire — what if they could manifest with you?</p>
+    <p>or maybe... you just want the validation of knowing your aesthetic is actually elite.<p>
 
     <a href="/dashboard" class="cta-btn">I want in!</a>
 </body>
