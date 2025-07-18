@@ -150,14 +150,6 @@ HOME_TEMPLATE = """
             transition: background-color 0.3s, color 0.3s;
         }
 
-        .flair {
-            color: #cc8888;
-            font-size: 20px;
-            position: absolute;
-            opacity: 0.6;
-            transition: color 0.3s;
-        }
-
         h1 {
             font-size: 64px;
             margin-bottom: 40px;
@@ -180,11 +172,24 @@ HOME_TEMPLATE = """
             color: #990000;
         }
 
+        .flair {
+            position: absolute;
+            font-size: 20px;
+            color: #cc8888;
+            opacity: 0.5;
+            animation: floaty 4s ease-in-out infinite alternate;
+        }
+
+        @keyframes floaty {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-10px); }
+        }
+
         #toggle-theme {
             position: absolute;
             top: 20px;
             right: 20px;
-            z-index: 2;
+            z-index: 999;
             font-size: 18px;
             border-radius: 30px;
         }
@@ -196,43 +201,43 @@ HOME_TEMPLATE = """
     <h1>p!nlyzer</h1>
     <a href="/login" class="btn">Login with Pinterest</a>
 
-    {% for i in range(30) %}
+    {% for i in range(25) %}
     <div class="flair" style="
-        top: {{ (loop.index * 33) % 100 }}%;
-        left: {{ (loop.index * 57) % 100 }}%;
-        transform: translate(-50%, -50%);
+        top: {{ (loop.index * 37) % 100 }}%;
+        left: {{ (loop.index * 53) % 100 }}%;
+        animation-delay: {{ (loop.index * 0.3) % 2 }}s;
     ">୨୧</div>
     {% endfor %}
 
     <script>
         const toggleBtn = document.getElementById('toggle-theme');
-        let darkMode = false;
+        const flairEls = document.querySelectorAll('.flair');
+        const loginBtn = document.querySelector('a.btn');
+
+        function setTheme(dark) {
+            document.body.style.backgroundColor = dark ? '#1e1e1e' : '#ffe6e6';
+            document.body.style.color = dark ? '#f2f2f2' : '#4b0000';
+            toggleBtn.textContent = dark ? '☀️' : '🌙';
+            flairEls.forEach(f => f.style.color = dark ? '#555' : '#cc8888');
+            loginBtn.style.backgroundColor = dark ? '#2e2e2e' : '#ffe6ea';
+            loginBtn.style.color = dark ? '#ff9999' : '#b30000';
+            loginBtn.style.borderColor = dark ? '#ff9999' : '#b30000';
+        }
+
+        // Load from localStorage
+        const darkMode = localStorage.getItem('darkMode') === 'true';
+        setTheme(darkMode);
 
         toggleBtn.addEventListener('click', () => {
-            darkMode = !darkMode;
-            document.body.style.backgroundColor = darkMode ? '#1e1e1e' : '#ffe6e6';
-            document.body.style.color = darkMode ? '#f2f2f2' : '#4b0000';
-
-            const flairs = document.querySelectorAll('.flair');
-            flairs.forEach(f => f.style.color = darkMode ? '#555555' : '#cc8888');
-
-            toggleBtn.textContent = darkMode ? '☀️' : '🌙';
-
-            const btn = document.querySelector('a.btn');
-            if (darkMode) {
-                btn.style.backgroundColor = '#2e2e2e';
-                btn.style.color = '#ff9999';
-                btn.style.borderColor = '#ff9999';
-            } else {
-                btn.style.backgroundColor = '#ffe6ea';
-                btn.style.color = '#b30000';
-                btn.style.borderColor = '#b30000';
-            }
+            const newMode = !(localStorage.getItem('darkMode') === 'true');
+            localStorage.setItem('darkMode', newMode);
+            setTheme(newMode);
         });
     </script>
 </body>
 </html>
 """
+
 
 
 DASHBOARD_TEMPLATE = """
@@ -250,6 +255,8 @@ DASHBOARD_TEMPLATE = """
             color: #4b0000;
             padding: 30px;
             transition: background-color 0.3s, color 0.3s;
+            position: relative;
+            overflow-x: hidden;
         }
 
         #toggle-theme {
@@ -309,6 +316,20 @@ DASHBOARD_TEMPLATE = """
             height: 200px;
             width: 100%;
         }
+
+        .flair {
+            position: absolute;
+            font-size: 20px;
+            color: #cc8888;
+            opacity: 0.4;
+            animation: floaty 5s ease-in-out infinite alternate;
+            pointer-events: none;
+        }
+
+        @keyframes floaty {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-10px); }
+        }
     </style>
 </head>
 <body>
@@ -360,6 +381,14 @@ DASHBOARD_TEMPLATE = """
         <div id="feature-result" class="mt-5"></div>
     </div>
 
+    {% for i in range(30) %}
+    <div class="flair" style="
+        top: {{ (loop.index * 21) % 100 }}%;
+        left: {{ (loop.index * 37) % 100 }}%;
+        animation-delay: {{ (loop.index * 0.3) % 2 }}s;
+    ">୨୧</div>
+    {% endfor %}
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         async function triggerFeature(feature, boardId) {
@@ -386,30 +415,39 @@ DASHBOARD_TEMPLATE = """
             }
         }
 
-        // === THEME TOGGLE ===
         const toggleBtn = document.getElementById('toggle-theme');
-        let darkMode = false;
+        const flairEls = document.querySelectorAll('.flair');
 
-        toggleBtn.addEventListener('click', () => {
-            darkMode = !darkMode;
-            document.body.style.backgroundColor = darkMode ? '#1e1e1e' : '#ffe6e6';
-            document.body.style.color = darkMode ? '#f2f2f2' : '#4b0000';
-            toggleBtn.textContent = darkMode ? '☀️' : '🌙';
+        function setTheme(dark) {
+            document.body.style.backgroundColor = dark ? '#1e1e1e' : '#ffe6e6';
+            document.body.style.color = dark ? '#f2f2f2' : '#4b0000';
+            toggleBtn.textContent = dark ? '☀️' : '🌙';
+            flairEls.forEach(f => f.style.color = dark ? '#555' : '#cc8888');
 
             const cards = document.querySelectorAll('.card');
             cards.forEach(card => {
-                card.style.backgroundColor = darkMode ? '#2e2e2e' : '#fff0f5';
-                card.style.color = darkMode ? '#f2f2f2' : '#4b0000';
+                card.style.backgroundColor = dark ? '#2e2e2e' : '#fff0f5';
+                card.style.color = dark ? '#f2f2f2' : '#4b0000';
             });
 
             const catalogue = document.getElementById('catalogue-box');
-            catalogue.style.backgroundColor = darkMode ? '#2e2e2e' : 'rgba(255, 240, 240, 0.85)';
-            catalogue.style.borderColor = darkMode ? '#ff99cc' : '#b30059';
+            catalogue.style.backgroundColor = dark ? '#2e2e2e' : 'rgba(255, 240, 240, 0.85)';
+            catalogue.style.borderColor = dark ? '#ff99cc' : '#b30059';
+        }
+
+        const darkMode = localStorage.getItem('darkMode') === 'true';
+        setTheme(darkMode);
+
+        toggleBtn.addEventListener('click', () => {
+            const newMode = !(localStorage.getItem('darkMode') === 'true');
+            localStorage.setItem('darkMode', newMode);
+            setTheme(newMode);
         });
     </script>
 </body>
 </html>
 """
+
 
 
 
