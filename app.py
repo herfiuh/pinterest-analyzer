@@ -372,7 +372,7 @@ ONBOARDING_TEMPLATE = """
     <p>what if you could talk to them — and they talked back?</p>
     <p>what if expert analysis revealed the hidden patterns behind your pins… your taste… your curation?</p>
     <p>what if your boards could do more than just inspire — what if they could manifest with you?</p>
-    <p>or maybe... you just want the validation of knowing your aesthetic is actually elite.<p>
+    <p>or maybe... you just want the validation of knowing your aesthetic is actually elite.</p>
 
     <a href="/dashboard" class="cta-btn">I want in!</a>
 </body>
