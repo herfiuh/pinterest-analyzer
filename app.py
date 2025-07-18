@@ -147,13 +147,15 @@ HOME_TEMPLATE = """
             height: 100vh;
             position: relative;
             overflow: hidden;
+            transition: background-color 0.3s, color 0.3s;
         }
 
         .flair {
-            color: #ffcccc;
+            color: #cc8888;
             font-size: 20px;
             position: absolute;
             opacity: 0.6;
+            transition: color 0.3s;
         }
 
         h1 {
@@ -170,15 +172,27 @@ HOME_TEMPLATE = """
             border: 2px solid #b30000;
             color: #b30000;
             z-index: 1;
+            transition: background-color 0.3s, color 0.3s, border 0.3s;
         }
 
         a.btn:hover {
             background-color: #ffccd5;
             color: #990000;
         }
+
+        #toggle-theme {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 2;
+            font-size: 18px;
+            border-radius: 30px;
+        }
     </style>
 </head>
 <body>
+    <button id="toggle-theme" class="btn btn-sm btn-outline-dark">🌙</button>
+
     <h1>p!nlyzer</h1>
     <a href="/login" class="btn">Login with Pinterest</a>
 
@@ -189,6 +203,33 @@ HOME_TEMPLATE = """
         transform: translate(-50%, -50%);
     ">୨୧</div>
     {% endfor %}
+
+    <script>
+        const toggleBtn = document.getElementById('toggle-theme');
+        let darkMode = false;
+
+        toggleBtn.addEventListener('click', () => {
+            darkMode = !darkMode;
+            document.body.style.backgroundColor = darkMode ? '#1e1e1e' : '#ffe6e6';
+            document.body.style.color = darkMode ? '#f2f2f2' : '#4b0000';
+
+            const flairs = document.querySelectorAll('.flair');
+            flairs.forEach(f => f.style.color = darkMode ? '#555555' : '#cc8888');
+
+            toggleBtn.textContent = darkMode ? '☀️' : '🌙';
+
+            const btn = document.querySelector('a.btn');
+            if (darkMode) {
+                btn.style.backgroundColor = '#2e2e2e';
+                btn.style.color = '#ff9999';
+                btn.style.borderColor = '#ff9999';
+            } else {
+                btn.style.backgroundColor = '#ffe6ea';
+                btn.style.color = '#b30000';
+                btn.style.borderColor = '#b30000';
+            }
+        });
+    </script>
 </body>
 </html>
 """
