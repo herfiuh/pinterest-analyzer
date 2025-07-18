@@ -1,6 +1,15 @@
 from flask import Flask, redirect, request, session, render_template_string, jsonify
 from requests_oauthlib import OAuth2Session
+from transformers import BlipProcessor, BlipForConditionalGeneration
+from colorthief import ColorThief
+import requests
+from io import BytesIO
+import colorsys
 import os
+
+processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-base")
+model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-base")
+
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
@@ -83,14 +92,46 @@ def logout():
 # ======= Backend API Endpoints for features =======
 
 # Analyze Theme (colors, general vibe)
+
+def get_caption(image_url):
+    resp = requests.get(image_url)
+    img = BytesIO(resp.content)
+    pixel_data = img.getvalue()
+    inputs = processor(images=pixel_data, return_tensors="pt")
+    out = model.generate(**inputs)
+    return processor.decode(out[0], skip_special_tokens=True)
+
+def get_palette(image_url, num_colors=5):
+    resp = requests.get(image_url)
+    img = BytesIO(resp.content)
+    ct = ColorThief(img)
+    palette = ct.get_palette(color_count=num_colors)
+    # Convert rgb tuples to hex
+    return ['#%02x%02x%02x' % rgb for rgb in palette]
+
 @app.route('/analyze_theme/<board_id>')
 def analyze_theme(board_id):
-    # TODO: implement color analysis and theme extraction logic
-    # Placeholder response
+    pinterest = OAuth2Session(CLIENT_ID, token=session['oauth_token'])
+    pins = pinterest.get(f'https://api.pinterest.com/v5/boards/{board_id}/pins').json().get('items', [])
+    
+    captions, palettes, combined = [], [], []
+    for pin in pins[:10]:  # limit to 10
+        img_url = pin.get('media', {}).get('images', {}).get('orig', {}).get('url')
+        if not img_url: continue
+        cap = get_caption(img_url)
+        pal = get_palette(img_url)
+        captions.append(cap)
+        palettes.extend(pal)
+        combined.append({'caption': cap, 'palette': pal})
+
+    theme = f"{captions[0].split()[0] if captions else 'Visual'} vibes with {len(palettes)} colors"
+    
     return jsonify({
         'board_id': board_id,
-        'theme_colors': ['#FF6F91', '#FF9671', '#FFC75F'],
-        'description': 'Warm pastel vibes with bright energy',
+        'captions': captions,
+        'dominant_palette': palettes[:5],
+        'combined': combined,
+        'theme_summary': theme
     })
 
 # Build Persona (psych profile of board owner from pins)
