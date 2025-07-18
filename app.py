@@ -145,31 +145,61 @@ HOME_TEMPLATE = """
             justify-content: center;
             align-items: center;
             height: 100vh;
+            position: relative;
+            overflow: hidden;
         }
+
+        .flair {
+            color: #ffcccc;
+            font-size: 20px;
+            position: absolute;
+            opacity: 0.6;
+        }
+
         h1 {
             font-size: 64px;
             margin-bottom: 40px;
             text-shadow: 1px 1px #ccc;
+            z-index: 1;
         }
+
         a.btn {
             font-size: 24px;
             padding: 15px 30px;
+            background-color: #ffe6ea;
+            border: 2px solid #b30000;
+            color: #b30000;
+            z-index: 1;
+        }
+
+        a.btn:hover {
+            background-color: #ffccd5;
+            color: #990000;
         }
     </style>
 </head>
 <body>
     <h1>p!nlyzer</h1>
-    <a href="/login" class="btn btn-dark">Login with Pinterest</a>
+    <a href="/login" class="btn">Login with Pinterest</a>
+
+    {% for i in range(30) %}
+    <div class="flair" style="
+        top: {{ (loop.index * 33) % 100 }}%;
+        left: {{ (loop.index * 57) % 100 }}%;
+        transform: translate(-50%, -50%);
+    ">୨୧</div>
+    {% endfor %}
 </body>
 </html>
 """
+
 
 DASHBOARD_TEMPLATE = """
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>p!nlyzer Dashboard</title>
+    <title>p!nlyzer dashboard</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap" rel="stylesheet">
     <style>
@@ -224,7 +254,7 @@ DASHBOARD_TEMPLATE = """
 </head>
 <body>
     <div class="container">
-        <div class="logo">p⚚nlyze</div>
+        <div class="logo">p!nlyzer</div>
 
         <div class="catalogue">
             <h2>p⚚nlyze</h2>
@@ -299,6 +329,7 @@ DASHBOARD_TEMPLATE = """
 </body>
 </html>
 """
+
 
 if __name__ == "__main__":
     app.run(debug=True)
