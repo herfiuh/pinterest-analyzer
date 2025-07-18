@@ -74,6 +74,12 @@ def dashboard():
     except Exception as e:
         return f"<h3>❌ Failed to load dashboard:</h3><pre>{str(e)}</pre>"
 
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect('/')
+
+
 # ======= Backend API Endpoints for features =======
 
 # Analyze Theme (colors, general vibe)
@@ -389,17 +395,6 @@ DASHBOARD_TEMPLATE = """
             color: #4b0000;
             padding: 30px;
             transition: background-color 0.3s, color 0.3s;
-            position: relative;
-            overflow-x: hidden;
-        }
-
-        #toggle-theme {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 999;
-            font-size: 18px;
-            border-radius: 30px;
         }
 
         .logo {
@@ -415,7 +410,6 @@ DASHBOARD_TEMPLATE = """
             border-radius: 12px;
             margin-bottom: 50px;
             text-align: center;
-            transition: background-color 0.3s, border 0.3s;
         }
 
         .board-card .card {
@@ -424,7 +418,6 @@ DASHBOARD_TEMPLATE = """
             border-radius: 15px;
             box-shadow: 0 4px 8px rgba(0,0,0,0.1);
             position: relative;
-            transition: background-color 0.3s, color 0.3s;
         }
 
         .feature-btn {
@@ -451,28 +444,56 @@ DASHBOARD_TEMPLATE = """
             width: 100%;
         }
 
-        .flair {
-            position: absolute;
-            font-size: 20px;
-            color: #cc8888;
-            opacity: 0.4;
-            animation: floaty 5s ease-in-out infinite alternate;
-            pointer-events: none;
+        /* Theme dark mode styles */
+        body.dark-mode {
+            background-color: #1e1e1e;
+            color: #ffe6e6;
         }
 
-        @keyframes floaty {
-            0% { transform: translateY(0); }
-            100% { transform: translateY(-10px); }
+        body.dark-mode .catalogue {
+            background: rgba(70, 0, 35, 0.4);
+            border-color: #ff99cc;
+        }
+
+        body.dark-mode .card {
+            background-color: #2c2c2c;
+            color: #ffe6e6;
+        }
+
+        /* Theme + brb button container */
+        .top-buttons {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .theme-btn {
+            border: none;
+            background: transparent;
+            font-size: 24px;
+            cursor: pointer;
+        }
+
+        .brb-btn {
+            font-family: Arial, sans-serif;
+            border-radius: 20px;
+            font-size: 14px;
+            padding: 6px 12px;
         }
     </style>
 </head>
 <body>
-    <button id="toggle-theme" class="btn btn-sm btn-outline-dark">🌙</button>
+    <div class="top-buttons">
+        <button id="toggle-theme" class="theme-btn">🌙</button>
+        <a href="/logout" class="btn btn-outline-danger brb-btn">brb</a>
+    </div>
 
     <div class="container">
         <div class="logo">p!nlyzer</div>
 
-        <div class="catalogue" id="catalogue-box">
+        <div class="catalogue">
             <h2>p⚚nlyze</h2>
             <p>Select a board to:</p>
             <ul style="list-style: none; padding-left: 0;">
@@ -515,72 +536,53 @@ DASHBOARD_TEMPLATE = """
         <div id="feature-result" class="mt-5"></div>
     </div>
 
-    {% for i in range(30) %}
-    <div class="flair" style="
-        top: {{ (loop.index * 21) % 100 }}%;
-        left: {{ (loop.index * 37) % 100 }}%;
-        animation-delay: {{ (loop.index * 0.3) % 2 }}s;
-    ">୨୧</div>
-    {% endfor %}
-
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         async function triggerFeature(feature, boardId) {
             let endpoint = '/' + feature + '/' + boardId;
             let options = {};
 
-            if (feature === 'talk_to_board') {
+            if(feature === 'talk_to_board') {
                 let message = prompt("Say something to your board:");
-                if (!message) return;
+                if(!message) return;
                 options = {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message })
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({message})
                 };
             }
 
             try {
                 const response = await fetch(endpoint, options);
                 const data = await response.json();
-                document.getElementById('feature-result').innerHTML =
+
+                document.getElementById('feature-result').innerHTML = 
                     '<h4>Feature: ' + feature.replace(/_/g, ' ') + '</h4><pre>' + JSON.stringify(data, null, 2) + '</pre>';
             } catch (err) {
                 alert('Error fetching feature data');
             }
         }
 
-        const toggleBtn = document.getElementById('toggle-theme');
-        const flairEls = document.querySelectorAll('.flair');
+        // Theme toggle with localStorage
+        const toggleTheme = document.getElementById('toggle-theme');
+        const body = document.body;
 
-        function setTheme(dark) {
-            document.body.style.backgroundColor = dark ? '#1e1e1e' : '#ffe6e6';
-            document.body.style.color = dark ? '#f2f2f2' : '#4b0000';
-            toggleBtn.textContent = dark ? '☀️' : '🌙';
-            flairEls.forEach(f => f.style.color = dark ? '#555' : '#cc8888');
-
-            const cards = document.querySelectorAll('.card');
-            cards.forEach(card => {
-                card.style.backgroundColor = dark ? '#2e2e2e' : '#fff0f5';
-                card.style.color = dark ? '#f2f2f2' : '#4b0000';
-            });
-
-            const catalogue = document.getElementById('catalogue-box');
-            catalogue.style.backgroundColor = dark ? '#2e2e2e' : 'rgba(255, 240, 240, 0.85)';
-            catalogue.style.borderColor = dark ? '#ff99cc' : '#b30059';
+        if (localStorage.getItem('theme') === 'dark') {
+            body.classList.add('dark-mode');
+            toggleTheme.textContent = '☀️';
         }
 
-        const darkMode = localStorage.getItem('darkMode') === 'true';
-        setTheme(darkMode);
-
-        toggleBtn.addEventListener('click', () => {
-            const newMode = !(localStorage.getItem('darkMode') === 'true');
-            localStorage.setItem('darkMode', newMode);
-            setTheme(newMode);
+        toggleTheme.addEventListener('click', () => {
+            body.classList.toggle('dark-mode');
+            const isDark = body.classList.contains('dark-mode');
+            toggleTheme.textContent = isDark ? '☀️' : '🌙';
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
         });
     </script>
 </body>
 </html>
 """
+
 
 
 
