@@ -7,4 +7,6 @@ services:
     branch: main
     region: oregon
     plan: free
-    pythonVersion: 3.11.9  # 🔥 Add this line
+    build:
+      pythonVersion: 3.11.9  # ✅ Correct location
+
